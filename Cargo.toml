@@ -1,0 +1,13 @@
+# Copyright (C) 2017 Chris Liebert
+
+[package]
+name = "genbind"
+version = "0.1.0"
+authors = ["chrisliebert <cbert745@gmail.com>"]
+description = "Automatically generates C FFI header declarations for unmangled Rust functions."
+keywords = ["FFI", "libc", "Rust"]
+readme = "README.md"
+
+[dependencies]
+libc = "0.2.29"
+syntex_syntax = "0.59.1"
