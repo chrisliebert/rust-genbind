@@ -38,9 +38,9 @@ Building as "dylib" makes it possible to invoke Rust methods from LuaJIT using t
 
 **TODO**
 
-Generate equivalent C structure for structs marked with #repr(C)
-Add support for pointers to Rust types marked with #repr(C).
-(see https://github.com/chrisliebert/quick-3d/blob/master/quick3d.h for an example of how the output would look)
+Generate equivalent C structure for structs marked with #repr(C).
+Add support for pointers to Rust types marked with #repr(C) 
+(see https://github.com/chrisliebert/quick-3d/blob/master/quick3d.h for an example of how the output would look).
 
 **License:**
 
