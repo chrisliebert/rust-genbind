@@ -5,6 +5,25 @@
 #![allow(unused_variables)]
 extern crate libc;
 
+pub struct StructNoReprC {
+	stuff: bool,
+}
+
+pub enum EnumNoReprC {
+	OPTION1, OPTION2, OPTION3, OPTION4, OPTION5,
+}
+
+#[repr(C)]
+pub struct StructWithReprC {
+	data1: bool,
+	data2: libc::c_int,
+}
+
+#[repr(C)]
+pub enum EnumWithReprC {
+	OPTION1, OPTION2, OPTION3, OPTION4, OPTION5,
+}
+
 #[no_mangle]
 pub unsafe fn with_unsafe_keyword() {}
 

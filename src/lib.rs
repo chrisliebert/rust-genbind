@@ -9,11 +9,11 @@ use syntax::codemap::{CodeMap, FilePathMapping};
 use syntax::errors::{Handler};
 use syntax::errors::emitter::{ColorConfig};
 use syntax::parse::{self, ParseSess};
-use syntax::ast::{Crate, FunctionRetTy, Ident, Item, ItemKind, Mutability, Path, PatKind, TyKind};
+use syntax::ast::{Crate, FunctionRetTy, Ident, Item, ItemKind, Mutability, Path, PatKind, TyKind, VariantData};
 use syntax::symbol::InternedString;
 
 // TODO: add option to limit output based on selected features.
-// TODO: parse structs that have #repr(C) enabled and support pointers and Boxed C structs
+// TODO: correctly support pointers and Boxed repr(C) structs
 
 fn item_is_nonmangled(item: &Item) -> bool {
 	// Return false if item node is not a function
@@ -29,6 +29,30 @@ fn item_is_nonmangled(item: &Item) -> bool {
 			let id: Ident = segment.identifier;
 			let attr_str: InternedString = id.name.as_str();
 			if attr_str == "no_mangle" {
+				return true;
+			}
+		}
+	}
+	
+	false
+}
+
+fn item_is_reprc(item: &Item) -> bool {
+	match &item.node {
+		&ItemKind::Enum(_, _) => (),
+		&ItemKind::Struct(_, _) => (),
+		_ => return false
+	};
+	
+	// TODO: determine if pub keyword is also required
+	
+	// Check for repr(c) segment in item's attributes
+	for attribute in &item.attrs {
+		let path: &Path = &attribute.path;
+		for segment in &path.segments {
+			let id: Ident = segment.identifier;
+			let attr_str: InternedString = id.name.as_str();
+			if attr_str == "repr" {
 				return true;
 			}
 		}
@@ -151,7 +175,6 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
     let treat_err_as_bug = false;
     let tty_handler = Handler::with_tty_emitter(ColorConfig::Auto, can_emit_warnings, treat_err_as_bug, Some(codemap.clone()));
     let parse_session = ParseSess::with_span_handler(tty_handler, codemap.clone());
-	//let input_src = std::path::Path::new("src/lib.rs");
     let result: Crate = parse::parse_crate_from_file(&input_src, &parse_session).expect(&format!("Unable to parse {:?}", input_src));
     let mut all_items: Vec<Item> = Vec::new();
     for item in &result.module.items {
@@ -177,7 +200,6 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
 	    			match fndecl.output.clone() {
 	    				FunctionRetTy::Default(_) => c_declaration.add_assign("void "),
 	    				FunctionRetTy::Ty(p) => {
-	    					//print!("{}", &get_type_string(&p.unwrap().node));
 	    					c_declaration.add_assign(&format!("{} ", &get_type_string(&p.unwrap().node)));
 	    				}
 	    			};
@@ -198,15 +220,50 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
 	    					PatKind::Lit(_) => (),
 	    					_ => (),
 	    				};
-	    				
+	    				// Put a space between function parameters
 	    				if param_count < fndecl.inputs.len() {
 	    					c_declaration.add_assign(", ");
 	    				}
 	    			}
 	    			c_declaration.add_assign(");");
 	    			c_declarations.push(c_declaration);
-    			}
-    			// Ignore anything that isn't a function
+    			},
+    			// Ignore anything that isn't a function or struct
+    			_ => (),
+    		}
+    	} else if item_is_reprc(&item) {
+    		// TODO: add enums and structs to the list of types detected by is_c_type() list at runtime
+    		match item.node {
+    			ItemKind::Enum(enum_def, _generics) => {
+    				let mut c_enum_declaration: String = String::from("typedef struct ");
+    				c_enum_declaration.add_assign(&format!("{} {{\n", item.ident.name.as_str()));
+    				for variant in &enum_def.variants {
+    					c_enum_declaration.add_assign(&format!("    {}", variant.node.name.name.as_str()));
+    					c_enum_declaration.add_assign(",\n");
+    				}
+    				c_enum_declaration.add_assign(&format!(" }} {};", item.ident.name.as_str()));
+    				c_declarations.push(c_enum_declaration);
+    			},
+    			ItemKind::Struct(variant_data, _generics) => {
+	    			match variant_data.clone() {
+	    				VariantData::Struct(fields, _id) => {
+	    					let mut c_struct_delcaration: String = String::from("typedef struct ");
+	    					c_struct_delcaration.add_assign(&format!("{} {{\n", item.ident.name.as_str()));
+	    					for field in fields {
+		    					match field.ident {
+		    						Some(ident) => {
+		    							c_struct_delcaration.add_assign(&format!("    {} ", &get_equivalent_c_type_string(&get_type_string(&field.ty.unwrap().node))));
+		    							c_struct_delcaration.add_assign(&format!("{};\n", ident.name.as_str()));
+		    						},
+		    						None => (),
+		    					}
+	    					}
+	    					c_struct_delcaration.add_assign(&format!("}} {};", item.ident.name.as_str()));
+	    					c_declarations.push(c_struct_delcaration);
+	    				},
+	    				_ => (),
+	    			};
+    			},
     			_ => (),
     		}
     	}
@@ -250,6 +307,9 @@ mod tests {
 		// Make sure only non-mangled functions are reported
 		assert!(!declarations.contains(&String::from("extern void mangled();")));
 		// Remaining assertions are regarding the output of processing test_module.rs
+		
+		// TODO: add test for StructWithReprC, StructNoReprC, EnumWithReprC, EnumNoReprC
+		
 		assert!(declarations.contains(&String::from("extern void with_unsafe_keyword();")));
 		assert!(declarations.contains(&String::from("extern void with_int_parameter(int number);")));
 		assert!(declarations.contains(&String::from("extern void with_libcc_schar_t_parameter(char p);")));
