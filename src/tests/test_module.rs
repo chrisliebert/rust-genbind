@@ -6,7 +6,8 @@
 extern crate libc;
 
 pub struct StructNoReprC {
-	stuff: bool,
+	data1: bool,
+	data2: libc::c_int,
 }
 
 pub enum EnumNoReprC {

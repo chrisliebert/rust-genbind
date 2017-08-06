@@ -232,14 +232,18 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
     			_ => (),
     		}
     	} else if item_is_reprc(&item) {
-    		// TODO: add enums and structs to the list of types detected by is_c_type() list at runtime
+    		// TODO: add enums and structs to the list of types detected by is_c_type() and get_equivalent_c_type_string() at runtime
     		match item.node {
     			ItemKind::Enum(enum_def, _generics) => {
-    				let mut c_enum_declaration: String = String::from("typedef struct ");
-    				c_enum_declaration.add_assign(&format!("{} {{\n", item.ident.name.as_str()));
+    				let mut c_enum_declaration: String = String::from("typedef enum ");
+    				c_enum_declaration.add_assign(&format!("{} {{ ", item.ident.name.as_str()));
+    				let mut variant_count = 0;
     				for variant in &enum_def.variants {
-    					c_enum_declaration.add_assign(&format!("    {}", variant.node.name.name.as_str()));
-    					c_enum_declaration.add_assign(",\n");
+    					variant_count += 1;
+    					c_enum_declaration.add_assign(&format!("{}", variant.node.name.name.as_str()));
+    					if variant_count < enum_def.variants.len() {
+    						c_enum_declaration.add_assign(", ");
+    					}
     				}
     				c_enum_declaration.add_assign(&format!(" }} {};", item.ident.name.as_str()));
     				c_declarations.push(c_enum_declaration);
@@ -248,12 +252,12 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
 	    			match variant_data.clone() {
 	    				VariantData::Struct(fields, _id) => {
 	    					let mut c_struct_delcaration: String = String::from("typedef struct ");
-	    					c_struct_delcaration.add_assign(&format!("{} {{\n", item.ident.name.as_str()));
-	    					for field in fields {
+	    					c_struct_delcaration.add_assign(&format!("{} {{ ", item.ident.name.as_str()));
+	    					for field in &fields {
 		    					match field.ident {
 		    						Some(ident) => {
-		    							c_struct_delcaration.add_assign(&format!("    {} ", &get_equivalent_c_type_string(&get_type_string(&field.ty.unwrap().node))));
-		    							c_struct_delcaration.add_assign(&format!("{};\n", ident.name.as_str()));
+		    							c_struct_delcaration.add_assign(&format!("{} ", &get_equivalent_c_type_string(&get_type_string(&field.clone().ty.unwrap().node))));
+		    							c_struct_delcaration.add_assign(&format!("{}; ", ident.name.as_str()));    							
 		    						},
 		    						None => (),
 		    					}
@@ -306,10 +310,18 @@ mod tests {
 		assert!(declarations.contains(&String::from("extern void simple();")));
 		// Make sure only non-mangled functions are reported
 		assert!(!declarations.contains(&String::from("extern void mangled();")));
+
 		// Remaining assertions are regarding the output of processing test_module.rs
+
+		// make sure non repr(C) structures are processed 
+		assert!(!declarations.contains(&String::from("typedef struct StructNoReprC { bool data1; int data2; } StructWithReprC;")));
+		assert!(!declarations.contains(&String::from("typedef enum EnumNoReprC { OPTION1, OPTION2, OPTION3, OPTION4, OPTION5 } EnumWithReprC;")));
+
+		// check structs and enums with #repr(C)
+		assert!(declarations.contains(&String::from("typedef struct StructWithReprC { bool data1; int data2; } StructWithReprC;")));
+		assert!(declarations.contains(&String::from("typedef enum EnumWithReprC { OPTION1, OPTION2, OPTION3, OPTION4, OPTION5 } EnumWithReprC;")));
 		
-		// TODO: add test for StructWithReprC, StructNoReprC, EnumWithReprC, EnumNoReprC
-		
+		// check function declarations
 		assert!(declarations.contains(&String::from("extern void with_unsafe_keyword();")));
 		assert!(declarations.contains(&String::from("extern void with_int_parameter(int number);")));
 		assert!(declarations.contains(&String::from("extern void with_libcc_schar_t_parameter(char p);")));
