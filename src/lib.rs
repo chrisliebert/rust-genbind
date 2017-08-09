@@ -12,8 +12,11 @@ use syntax::parse::{self, ParseSess};
 use syntax::ast::{Crate, FunctionRetTy, Ident, Item, ItemKind, Mutability, Path, PatKind, TyKind, VariantData};
 use syntax::symbol::InternedString;
 
-// TODO: add option to limit output based on selected features.
-// TODO: correctly support pointers and Boxed repr(C) structs
+// TODO: add option to limit output based on selected features and other cfg attributes
+// TODO: correctly support Box pointers of types as pointers
+// TODO: boxed repr(C) struct can have i32, i64, etc. Can I also use i32, i64 as parameters?
+// TODO: determine if pub keyword is also required along with no_mangle
+// TODO: investigate whether arrays can be supported
 
 fn item_is_nonmangled(item: &Item) -> bool {
 	// Return false if item node is not a function
@@ -44,8 +47,6 @@ fn item_is_reprc(item: &Item) -> bool {
 		_ => return false
 	};
 	
-	// TODO: determine if pub keyword is also required
-	
 	// Check for repr(c) segment in item's attributes
 	for attribute in &item.attrs {
 		let path: &Path = &attribute.path;
@@ -61,7 +62,14 @@ fn item_is_reprc(item: &Item) -> bool {
 	false
 }
 
-fn is_c_type(type_str: &str) -> bool {
+fn is_c_type(full_type_str: &str, additional_types: &mut Vec<String>) -> bool {
+	let mut type_string: String = String::from(full_type_str);
+	// If the first 6 chars are 'const ', remove them
+	if type_string.len() > 6 && "const " == &String::from(&type_string[..6]) {
+		type_string = String::from(&type_string[6..]);
+	}
+	
+	let type_str: &str = &type_string;
 	match type_str {
 		"void" => true,
 		"bool" => true,
@@ -78,12 +86,25 @@ fn is_c_type(type_str: &str) -> bool {
 		"unsigned int" => true,
 		"unsigned long" => true,
 		"unsigned long long" => true,
-		_ => false,
+		_ => {
+			// Check to see if this is a pointer to a struct or enum or pointer chain that was recently scanned
+			let mut type_star_str: String = String::from(type_str);
+			
+			while type_star_str.len() > 0 && '*' == type_star_str.chars().last().unwrap() {
+				type_star_str = String::from(&type_star_str[..type_star_str.len() - 1]);
+				if is_c_type(&type_star_str, additional_types) {
+					return true;
+				}
+			}
+
+			// Check to see if this is type that was recently scanned
+			additional_types.contains(&String::from(type_str))
+		},
 	}
 }
 
-fn get_equivalent_c_type_string(rust_type: &str) -> String {
-	if is_c_type(&rust_type) {
+fn get_equivalent_c_type_string(rust_type: &str, additional_types: &mut Vec<String>) -> String {
+	if is_c_type(&rust_type, additional_types) {
 		return String::from(rust_type);
 	}
 	
@@ -110,24 +131,15 @@ fn get_equivalent_c_type_string(rust_type: &str) -> String {
 		"libcuint16_t" => "unsigned short",
 		"libcuint32_t" => "unsigned int",
 		"libcuint64_t" => "unsigned long",
-		
-		/*   TODO: support these types from lib.rs in libc crate
-		pub type size_t = usize;
-		ptrdiff_t = isize;
-		intptr_t = isize;
-		uintptr_t = usize;
-		ssize_t = isize;
-		*/
-		
 		_ => {
-			// TODO: search for structs marked with #repr(C) and enable as type param only if boxed, then issue c declaration with pointer to #repr(c)'ed type. Also must convert repr(c) type to C struct and declare initially before parsing function declarations.
+			// enable as type param if boxed as pointer
 			println!("Could not find C equivalent for {}, using void*", rust_type);
 			"void*"
 		}
 	})
 }
 
-fn get_type_string(node: &TyKind) -> String {
+fn get_type_string(node: &TyKind, additional_types: &mut Vec<String>) -> String {
 	let mut type_str: String = String::new();
 	match node.clone() {
 		TyKind::Path(_q, p) => {
@@ -142,7 +154,7 @@ fn get_type_string(node: &TyKind) -> String {
 					the_type_string.add_assign(" ");
 				}
 			}
-			type_str.add_assign(&get_equivalent_c_type_string(&the_type_string));
+			type_str.add_assign(&get_equivalent_c_type_string(&the_type_string, additional_types));
 		},
 		TyKind::Ptr(mut_ty) => {
 			// Check to see if variable is const
@@ -150,7 +162,7 @@ fn get_type_string(node: &TyKind) -> String {
 				Mutability::Immutable => type_str.add_assign("const "),	
 				Mutability::Mutable => (),	// variables are mutable by default in C
 			};
-			type_str.add_assign(&get_equivalent_c_type_string(&get_type_string(&mut_ty.ty.unwrap().node)));
+			type_str.add_assign(&get_equivalent_c_type_string(&get_type_string(&mut_ty.ty.unwrap().node, additional_types), additional_types));
 			type_str.add_assign("*");
 		}
 		// TODO: investigate whether arrays can be supported: 
@@ -161,7 +173,7 @@ fn get_type_string(node: &TyKind) -> String {
 			type_str.add_assign("void*");
 		},
 	}
-	return type_str;	
+	return type_str;
 }
 
 pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
@@ -181,7 +193,6 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
     	match item.node.clone() {
     		ItemKind::Mod(m) => {
     			// Look for modules, and add their items to the search
-    			//println!("searching module named {:?}", item.ident.name.as_str());   			
     			for module_item in m.items {
     				all_items.push(module_item.unwrap());
     			}
@@ -190,17 +201,17 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
     	}
     	all_items.push(item.clone().unwrap());
     }
+    let mut additional_types: Vec<String> = Vec::new();
     
     for item in all_items {
     	if item_is_nonmangled(&item) {
     		match item.node {
     			ItemKind::Fn(fndecl, _unsafety, _constness, _abi, _generics, _block) => {
-	    			// print return type
 	    			let mut c_declaration = String::from("extern ");
 	    			match fndecl.output.clone() {
 	    				FunctionRetTy::Default(_) => c_declaration.add_assign("void "),
 	    				FunctionRetTy::Ty(p) => {
-	    					c_declaration.add_assign(&format!("{} ", &get_type_string(&p.unwrap().node)));
+	    					c_declaration.add_assign(&format!("{} ", &get_type_string(&p.unwrap().node, &mut additional_types)));
 	    				}
 	    			};
 	    			c_declaration.add_assign(&format!("{}(", item.ident.name.as_str()));		
@@ -210,7 +221,7 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
 	    				match input.pat.node.clone() {
 	    					PatKind::Ident(_binding_mode, spanned_indent, _path) => {
 	    						// Parameter type
-	    						let rust_type_string = &get_type_string(&input.clone().ty.unwrap().node);
+	    						let rust_type_string = &get_type_string(&input.clone().ty.unwrap().node, &mut additional_types);
 	    						c_declaration.add_assign(&format!("{}", &rust_type_string));
 	    						c_declaration.add_assign(&format!(" {}", spanned_indent.node.name.as_str()));
 	    					},
@@ -232,11 +243,12 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
     			_ => (),
     		}
     	} else if item_is_reprc(&item) {
-    		// TODO: add enums and structs to the list of types detected by is_c_type() and get_equivalent_c_type_string() at runtime
     		match item.node {
     			ItemKind::Enum(enum_def, _generics) => {
     				let mut c_enum_declaration: String = String::from("typedef enum ");
-    				c_enum_declaration.add_assign(&format!("{} {{ ", item.ident.name.as_str()));
+    				let typename: String = format!("{}", item.ident.name.as_str());
+    				c_enum_declaration.add_assign(&format!("{} {{ ", &typename));
+    				additional_types.push(typename);
     				let mut variant_count = 0;
     				for variant in &enum_def.variants {
     					variant_count += 1;
@@ -252,11 +264,13 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
 	    			match variant_data.clone() {
 	    				VariantData::Struct(fields, _id) => {
 	    					let mut c_struct_delcaration: String = String::from("typedef struct ");
-	    					c_struct_delcaration.add_assign(&format!("{} {{ ", item.ident.name.as_str()));
+	    					let typename: String = format!("{}", item.ident.name.as_str());
+		    				c_struct_delcaration.add_assign(&format!("{} {{ ", &typename));
+		    				additional_types.push(typename);
 	    					for field in &fields {
 		    					match field.ident {
 		    						Some(ident) => {
-		    							c_struct_delcaration.add_assign(&format!("{} ", &get_equivalent_c_type_string(&get_type_string(&field.clone().ty.unwrap().node))));
+		    							c_struct_delcaration.add_assign(&format!("{} ", &get_equivalent_c_type_string(&get_type_string(&field.clone().ty.unwrap().node, &mut additional_types), &mut additional_types)));
 		    							c_struct_delcaration.add_assign(&format!("{}; ", ident.name.as_str()));    							
 		    						},
 		    						None => (),
@@ -320,6 +334,10 @@ mod tests {
 		// check structs and enums with #repr(C)
 		assert!(declarations.contains(&String::from("typedef struct StructWithReprC { bool data1; int data2; } StructWithReprC;")));
 		assert!(declarations.contains(&String::from("typedef enum EnumWithReprC { OPTION1, OPTION2, OPTION3, OPTION4, OPTION5 } EnumWithReprC;")));
+		// check nested structs with #repr(C)
+		assert!(declarations.contains(&String::from("typedef struct NestedWithReprC { double amount; StructWithReprC nested_struct; EnumWithReprC nested_enum; } NestedWithReprC;")));
+		// Struct with pointers to pointers
+		assert!(declarations.contains(&String::from("typedef struct NestedWithPointerToType { const float* const_value_ptr; float* mut_value_ptr; StructWithReprC* nested_struct_ptr; EnumWithReprC* nested_enum_ptr; StructWithReprC** nested_struct_ptr_ptr; StructWithReprC*** nested_struct_ptr_ptr_ptr; } NestedWithPointerToType;")));
 		
 		// check function declarations
 		assert!(declarations.contains(&String::from("extern void with_unsafe_keyword();")));
@@ -349,5 +367,7 @@ mod tests {
 		assert!(declarations.contains(&String::from("extern void with_two_parameters(int i, long l);")));
 		assert!(declarations.contains(&String::from("extern bool with_bool_return_type();")));
 		assert!(declarations.contains(&String::from("extern int with_int_return_type();")));	
+		// repr(C) structs pointers as parameters
+		assert!(declarations.contains(&String::from("extern void with_struct_ptr_parameter(StructWithReprC* struct_struct_ptr, StructWithReprC** nested_struct_ptr_ptr);")));
 	}
 }

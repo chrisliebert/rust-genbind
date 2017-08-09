@@ -25,6 +25,26 @@ pub enum EnumWithReprC {
 	OPTION1, OPTION2, OPTION3, OPTION4, OPTION5,
 }
 
+#[repr(C)]
+pub struct NestedWithReprC {
+	amount: libc::c_double,
+	nested_struct: StructWithReprC,
+	nested_enum: EnumWithReprC,
+}
+
+#[repr(C)]
+pub struct NestedWithPointerToType {
+	const_value_ptr: *const libc::c_float,
+	mut_value_ptr: *mut libc::c_float,
+	nested_struct_ptr: *mut StructWithReprC,
+	nested_enum_ptr: *mut EnumWithReprC,
+	nested_struct_ptr_ptr: *mut *mut StructWithReprC,
+	nested_struct_ptr_ptr_ptr: *mut *mut *mut StructWithReprC,
+}
+
+#[no_mangle]
+pub fn with_struct_ptr_parameter(struct_struct_ptr: *mut StructWithReprC, nested_struct_ptr_ptr: *mut *mut StructWithReprC) {}
+
 #[no_mangle]
 pub unsafe fn with_unsafe_keyword() {}
 
