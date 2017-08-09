@@ -1,49 +1,61 @@
 // Copyright (C) 2017 Chris Liebert
 
 #![allow(dead_code)]
-#![allow(private_no_mangle_fns)] 
+#![allow(private_no_mangle_fns)]
 #![allow(unused_variables)]
 extern crate libc;
 
 pub struct StructNoReprC {
-	data1: bool,
-	data2: libc::c_int,
+    data1: bool,
+    data2: libc::c_int,
 }
 
 pub enum EnumNoReprC {
-	OPTION1, OPTION2, OPTION3, OPTION4, OPTION5,
+    OPTION1,
+    OPTION2,
+    OPTION3,
+    OPTION4,
+    OPTION5,
 }
 
 #[repr(C)]
 pub struct StructWithReprC {
-	data1: bool,
-	data2: libc::c_int,
+    data1: bool,
+    data2: libc::c_int,
 }
 
 #[repr(C)]
 pub enum EnumWithReprC {
-	OPTION1, OPTION2, OPTION3, OPTION4, OPTION5,
+    OPTION1,
+    OPTION2,
+    OPTION3,
+    OPTION4,
+    OPTION5,
 }
 
 #[repr(C)]
 pub struct NestedWithReprC {
-	amount: libc::c_double,
-	nested_struct: StructWithReprC,
-	nested_enum: EnumWithReprC,
+    amount: libc::c_double,
+    nested_struct: StructWithReprC,
+    nested_enum: EnumWithReprC,
 }
 
 #[repr(C)]
 pub struct NestedWithPointerToType {
-	const_value_ptr: *const libc::c_float,
-	mut_value_ptr: *mut libc::c_float,
-	nested_struct_ptr: *mut StructWithReprC,
-	nested_enum_ptr: *mut EnumWithReprC,
-	nested_struct_ptr_ptr: *mut *mut StructWithReprC,
-	nested_struct_ptr_ptr_ptr: *mut *mut *mut StructWithReprC,
+    const_value_ptr: *const libc::c_float,
+    mut_value_ptr: *mut libc::c_float,
+    nested_struct_ptr: *mut StructWithReprC,
+    nested_enum_ptr: *mut EnumWithReprC,
+    nested_struct_ptr_ptr: *mut *mut StructWithReprC,
+    nested_struct_ptr_ptr_ptr: *mut *mut *mut StructWithReprC,
 }
 
 #[no_mangle]
-pub fn with_struct_ptr_parameter(struct_struct_ptr: *mut StructWithReprC, nested_struct_ptr_ptr: *mut *mut StructWithReprC) {}
+pub fn with_struct_ptr_parameter(
+    struct_struct_ptr: *mut StructWithReprC,
+    nested_struct_ptr_ptr: *mut *mut StructWithReprC,
+) {
+}
 
 #[no_mangle]
 pub unsafe fn with_unsafe_keyword() {}
@@ -53,24 +65,24 @@ pub fn with_int_parameter(number: libc::c_int) {}
 
 #[no_mangle]
 pub fn with_const_char_ptr(c_str: *const libc::c_char) {
-	use std::ffi::CStr;
-	let string: String = unsafe{ CStr::from_ptr(c_str).to_string_lossy().into_owned() };
-	println!("Hello {}", &string);
+    use std::ffi::CStr;
+    let string: String = unsafe { CStr::from_ptr(c_str).to_string_lossy().into_owned() };
+    println!("Hello {}", &string);
 }
 
 #[no_mangle]
 pub fn with_two_parameters(i: libc::c_int, l: libc::c_long) {
-	println!("Hello {:?}, {:?}", i as i32, l as i64);
+    println!("Hello {:?}, {:?}", i as i32, l as i64);
 }
 
 #[no_mangle]
 pub fn with_bool_return_type() -> bool {
-	true
+    true
 }
 
 #[no_mangle]
 pub fn with_int_return_type() -> libc::c_int {
-	53
+    53
 }
 
 #[no_mangle]
