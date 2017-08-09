@@ -38,10 +38,10 @@ Building as "dylib" makes it possible to invoke Rust methods from LuaJIT using t
 
 **TODO**
 
-Provide a way to set cfg options such as #[cfg(target_os = "windows")], #[cfg(feature = "somefeature")] and/or translate to preprocessor directives
-correctly support Box pointers of types as pointers
-boxed repr(C) struct can have i32, i64, etc. Can I also use i32, i64 as parameters and investigate whether arrays can be supported?
-determine if pub keyword is required along with no_mangle
+Provide a way to set cfg options such as #[cfg(target_os = "windows")], #[cfg(feature = "somefeature")] and/or translate to preprocessor directives.
+Correctly support Box pointers of types as pointers.
+Boxed repr(C) struct can have i32, i64, etc. Can I also use i32, i64 as parameters and investigate whether arrays can be supported?
+Determine if pub keyword is required along with no_mangle.
 
 
 **License:**
