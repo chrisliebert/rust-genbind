@@ -4,7 +4,7 @@ Genbind is a tool designed to generate C header declarations for all Rust functi
 
 **How To**
 
-First set `crate-type` to include "dylib" or "staticlib" in your Cargo.toml to instruct cargo to generate a C library (ex: `crate-type = ["staticlib", "rlib"]`). Then run genbind on the root source file containing one or more non-mangled functions to generate the C header file. Now build your project to generated the C library which will appear in the target/* directory. Link your C project to the newly generated C library.
+First set `crate-type` to include "dylib" or "staticlib" in your Cargo.toml to instruct cargo to generate a C library (ex: `crate-type = ["staticlib", "rlib"]`). Then run genbind on the root source file containing one or more non-mangled functions to generate the C header file. Now build your project to generate the C library which will appear in the target/* directory. Link your C project to the newly generated C library.
 
 **Extra**
 
