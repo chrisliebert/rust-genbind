@@ -10,17 +10,24 @@ ADD_EXECUTABLE(c_example example.c example.h)
 ADD_EXECUTABLE(c_test test.c example.h)
 
 SET(EXAMPLE_LIBRARY examplelib)
+SET(EXAMPLE_LIBRARIES ${EXAMPLE_LIBRARY})
 
 IF(MSVC)
 	# Append some additional libraries required by MSVC compiler
-	SET(EXAMPLE_LIBRARY examplelib advapi32 ws2_32 userenv shell32 msvcrt)
+	SET(EXAMPLE_LIBRARIES examplelib advapi32 ws2_32 userenv shell32 msvcrt)
 	# LINK_DIRECTORIES(..) alone is not sufficieexnt for MSVC
 	SET(MSVCLIBPATH "${CMAKE_EXE_LINKER_FLAGS} /LIBPATH:${example_LIB_PATH}")
 	SET(CMAKE_EXE_LINKER_FLAGS "${MSVCLIBPATH}")
 ENDIF(MSVC)
 
-TARGET_LINK_LIBRARIES(c_example ${EXAMPLE_LIBRARY})
-TARGET_LINK_LIBRARIES(c_test ${EXAMPLE_LIBRARY})
+IF(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    # Link Pthread and dl required on linux
+    FIND_PACKAGE(Threads REQUIRED)
+    SET(EXAMPLE_LIBRARIES examplelib ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+ENDIF(${CMAKE_SYSTEM_NAME} STREQUAL "Linux") 
+
+TARGET_LINK_LIBRARIES(c_example ${EXAMPLE_LIBRARIES})
+TARGET_LINK_LIBRARIES(c_test ${EXAMPLE_LIBRARIES})
 
 # Use C instead of CXX
 SET_TARGET_PROPERTIES(c_example PROPERTIES LINKER_LANGUAGE C)

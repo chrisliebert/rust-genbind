@@ -17,6 +17,22 @@ fn is_debug() -> bool {
     false
 }
 
+/// Return the created time of file if OS supports,
+/// otherwise returns now()
+fn get_file_time(path: &Path) -> SystemTime {
+    match path.metadata() {
+        Ok(metadata) => {
+            match metadata.created() {
+                Ok(time) => time,
+                Err(_) => SystemTime::now(),
+            }
+        },
+        Err(_) => {
+            SystemTime::now()
+        }
+     } 
+}
+
 fn find_dependent_shared_library(filename_prefix: &str, filename_suffix: &str) -> String {
     let build_type: String = match is_debug() {
         true => String::from("debug"),
@@ -42,11 +58,7 @@ fn find_dependent_shared_library(filename_prefix: &str, filename_suffix: &str) -
                                 {
                                     possible_matches.push((
                                         possible,
-                                        possible_path
-                                            .metadata()
-                                            .expect("Unable to get file metadata")
-                                            .created()
-                                            .expect("Unable to get date created time"),
+                                        get_file_time(&possible_path)
                                     ));
                                 }
                             }
