@@ -15,9 +15,9 @@ int main(int argc, char** argv) {
     iv3a.z = 65;
     IntVector3 iv3b;
     iv3b.x = 743;
-	iv3b.y = 34;
-	iv3b.z = 64;
-	IntVector3 iv3sum = add_int_vector3s(&iv3a, &iv3b);
+    iv3b.y = 34;
+    iv3b.z = 64;
+    IntVector3 iv3sum = add_int_vector3s(&iv3a, &iv3b);
     print_int(iv3sum.x);
     print_int(iv3sum.y);
     print_int(iv3sum.z);
