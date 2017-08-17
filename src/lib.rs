@@ -9,12 +9,11 @@ use syntax::codemap::{CodeMap, FilePathMapping};
 use syntax::errors::Handler;
 use syntax::errors::emitter::ColorConfig;
 use syntax::parse::{self, ParseSess};
-use syntax::ast::{Crate, FunctionRetTy, Ident, Item, ItemKind, Mutability, Path, PatKind, TyKind,
-                  VariantData};
+use syntax::ast::{Crate, FunctionRetTy, Ident, Item, ItemKind, Mutability, Path, PathParameters,
+                  PatKind, TyKind, VariantData};
 use syntax::symbol::InternedString;
 
 // TODO: add option to limit output based on selected features and other cfg attributes
-// TODO: correctly support Box pointers of types as pointers
 // TODO: boxed repr(C) struct can have i32, i64, etc. Can I also use i32, i64 as parameters?
 // TODO: determine if pub keyword is also required along with no_mangle
 // TODO: investigate whether arrays can be supported
@@ -227,10 +226,50 @@ pub fn get_c_declarations(input_src: &std::path::Path) -> Vec<String> {
                     match fndecl.output.clone() {
                         FunctionRetTy::Default(_) => c_declaration.add_assign("void "),
                         FunctionRetTy::Ty(p) => {
-                            c_declaration.add_assign(&format!(
-                                "{} ",
-                                &get_type_string(&p.unwrap().node, &mut additional_types)
-                            ));
+                            // Check for Box<?>
+                            let mut is_boxed_type: Option<String> = None;
+                            match p.clone().unwrap().node {
+                                TyKind::Path(_q, path) => {
+                                    for segment in path.segments {
+                                        if segment.identifier.name.as_str() == "Box" {
+                                            match segment.parameters {
+                                                Some(parameter_ptr) => {
+                                                    match parameter_ptr.unwrap() {
+                                                        PathParameters::AngleBracketed(data) => {
+                                                            for parameter_type_ptr in data.types {
+                                                                is_boxed_type =
+                                                                    Some(get_type_string(
+                                                                        &parameter_type_ptr
+                                                                            .unwrap()
+                                                                            .node,
+                                                                        &mut additional_types,
+                                                                    ));
+                                                            }
+                                                        }
+                                                        _ => (),
+                                                    }
+                                                }
+                                                None => (),
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => (),
+                            }
+                            match is_boxed_type {
+                                Some(boxed_type) => {
+                                    c_declaration.add_assign(&format!("{}* ", boxed_type))
+                                }
+                                None => {
+                                    c_declaration.add_assign(&format!(
+                                        "{} ",
+                                        &get_type_string(
+                                            &p.unwrap().node,
+                                            &mut additional_types,
+                                        )
+                                    ));
+                                }
+                            };
                         }
                     };
                     c_declaration.add_assign(&format!("{}(", item.ident.name.as_str()));
@@ -486,5 +525,9 @@ mod tests {
         )));
         // repr(C) structs pointers as parameters
         assert!(declarations.contains(&String::from("extern void with_struct_ptr_parameter(StructWithReprC* struct_struct_ptr, StructWithReprC** nested_struct_ptr_ptr);")));
+        // boxed struct pointer (allocated on heap by std::box::Box<?>)
+        assert!(declarations.contains(&String::from(
+            "extern StructWithReprC* new_struct_on_heap();",
+        )));
     }
 }

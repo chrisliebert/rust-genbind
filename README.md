@@ -36,10 +36,11 @@ Now generate language bindings of your choice, see http://www.swig.org/tutorial.
 
 Building as "dylib" makes it possible to invoke Rust methods from LuaJIT using the LuaJIT FFI Library, see http://luajit.org/ext_ffi.html
 
+Note: When working with repr(C) structs, it is important to allocate on the heap instead of the stack to avoid inconsistant garbage collection issues; the std::boxed::Box can be used to allocate and free using the heap from the context of a foreign language.
+
 **TODO**
 
 Provide a way to set cfg options such as #[cfg(target_os = "windows")], #[cfg(feature = "somefeature")] and/or translate to preprocessor directives.
-Correctly support Box pointers of types as pointers.
 Boxed repr(C) struct can have i32, i64, etc. Can I also use i32, i64 as parameters and investigate whether arrays can be supported?
 Determine if pub keyword is required along with no_mangle.
 

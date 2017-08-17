@@ -51,13 +51,6 @@ pub struct NestedWithPointerToType {
 }
 
 #[no_mangle]
-pub fn with_struct_ptr_parameter(
-    struct_struct_ptr: *mut StructWithReprC,
-    nested_struct_ptr_ptr: *mut *mut StructWithReprC,
-) {
-}
-
-#[no_mangle]
 pub unsafe fn with_unsafe_keyword() {}
 
 #[no_mangle]
@@ -147,3 +140,18 @@ pub fn with_libcuint32_t_parameter(p: libc::uint32_t) {}
 
 #[no_mangle]
 pub fn with_libcuint64_t_parameter(p: libc::uint64_t) {}
+
+#[no_mangle]
+pub fn with_struct_ptr_parameter(
+    struct_struct_ptr: *mut StructWithReprC,
+    nested_struct_ptr_ptr: *mut *mut StructWithReprC,
+) {
+}
+
+#[no_mangle]
+pub fn new_struct_on_heap() -> std::boxed::Box<StructWithReprC> {
+    Box::new(StructWithReprC {
+        data1: true,
+        data2: 4,
+    })
+}
