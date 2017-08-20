@@ -1,4 +1,7 @@
 // Copyright (C) 2017 Chris Liebert
+#![crate_type = "lib"]
+#![crate_name = "examplelib"]
+
 extern crate libc;
 
 #[no_mangle]

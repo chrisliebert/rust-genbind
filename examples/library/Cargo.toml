@@ -4,11 +4,15 @@
 name = "examplelib"
 version = "0.1.2"
 authors = ["Chris Liebert <cbert745@gmail.com>"]
+build = "build.rs"
 
 [dependencies]
 libc = "0.2.29"
 
+[build-dependencies]
+genbind = { path = '../..' }
+
 [lib]
 name = "examplelib"
 path = "lib.rs"
-crate-type = ["staticlib", "rlib"]
+crate-type = ["dylib", "staticlib", "rlib"]
