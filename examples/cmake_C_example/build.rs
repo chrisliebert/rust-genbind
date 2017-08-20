@@ -96,14 +96,14 @@ fn find_dependent_shared_library(filename_prefix: &str, filename_suffix: &str) -
 
 #[cfg(target_os = "windows")]
 fn copy_shared_library() -> std::io::Result<()> {
-    let path_str: String = find_dependent_shared_library("examplelib-", ".lib");
+    let path_str: String = find_dependent_shared_library("examplelib", ".lib");
     try!(fs::copy(Path::new(&path_str), Path::new("examplelib.lib")));
     Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]
 fn copy_shared_library() -> std::io::Result<()> {
-    let path_str: String = find_dependent_shared_library("libexamplelib-", ".a");
+    let path_str: String = find_dependent_shared_library("libexamplelib", ".a");
     try!(fs::copy(Path::new(&path_str), Path::new("libexamplelib.a")));
     Ok(())
 }
